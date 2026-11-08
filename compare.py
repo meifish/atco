@@ -90,6 +90,52 @@ def extract(data):
         renderer.close()
     return pages
 
+def readable_changes(removed, added):
+    """Report text once; absorb small filled glyph paths into changed words.
+
+    Text is used as a label, not as a separate invisible rendering layer.
+    This geometric heuristic deliberately preserves stroked and large objects.
+    """
+    def words(items):
+        unique = {}
+        for obj in items:
+            if obj['kind'] != 'char' or not obj.get('text', '').strip():
+                continue
+            word = obj.get('word') or {'text': obj['text'], 'box': obj['box']}
+            key = (word['text'], normalize(word['box']))
+            unique[key] = {'kind': 'char', 'text': word['text'],
+                           'box': list(word['box']), 'style': []}
+        return list(unique.values())
+    before_words, after_words = unmatched(words(removed), words(added))
+    def combine(items, changed_words):
+        # Use fixed recognition boxes; expanding display boxes must not swallow neighbors.
+        boxes = [(word, list(word['box'])) for word in changed_words]
+        output = list(changed_words)
+        for obj in items:
+            if obj['kind'] == 'char':
+                continue
+            owner = None
+            if obj['kind'] in ('curve', 'rect', 'line'):
+                style = obj.get('style') or []
+                if len(style) > 2 and style[2] and not style[1]:
+                    x0, y0, x1, y1 = obj['box']
+                    for word, box in boxes:
+                        height = max(1, box[3] - box[1])
+                        pad = height * .4 + .5
+                        if (x1-x0 <= height*2 and y1-y0 <= height*2
+                            and x0 >= box[0]-pad and x1 <= box[2]+pad
+                            and y0 >= box[1]-pad and y1 <= box[3]+pad):
+                            owner = word
+                            break
+            if owner is None:
+                output.append(obj)
+            else:
+                b, g = owner['box'], obj['box']
+                owner['box'] = [min(b[0],g[0]), min(b[1],g[1]),
+                                max(b[2],g[2]), max(b[3],g[3])]
+        return output
+    return combine(removed, before_words), combine(added, after_words)
+
 def compare(before,after):
     a,b=extract(before),extract(after)
     pages=[]
@@ -97,6 +143,7 @@ def compare(before,after):
         left=a[index] if index<len(a) else None
         right=b[index] if index<len(b) else None
         removed,added=unmatched(left['objects'] if left else [],right['objects'] if right else [])
+        removed,added=readable_changes(removed,added)
         for page,changes in [(left,removed),(right,added)]:
             if page is not None:
                 page.pop('objects')

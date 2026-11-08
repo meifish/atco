@@ -1,6 +1,6 @@
 const $=id=>document.getElementById(id);
 const files={before:null,after:null};let result=null,pageIndex=0,zoom=1,regions=[],syncing=false,selectedRegion=null;
-const names={line:'直線',curve:'向量路徑',rect:'矩形',char:'文字字元',image:'圖片',annotation:'批註'};
+const names={line:'直線',curve:'向量路徑',rect:'矩形',char:'文字',image:'圖片',annotation:'批註'};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function selectFile(side,file){if(!file)return;files[side]=file;$(side+'Name').textContent=file.name;updateButton();}
 function updateButton(){$('compare').disabled=!files.before||!files.after;}
