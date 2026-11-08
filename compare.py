@@ -82,9 +82,24 @@ def extract(data):
                 if total > MAX_OBJECTS: raise ValueError('圖面物件過多，請拆成較小的 PDF 再比對。')
                 rp=renderer[index]
                 bitmap=rp.render(scale=min(1.1,2200/max(page.width,page.height)),draw_annots=False)
-                out=io.BytesIO();bitmap.to_pil().save(out,format='PNG')
-                bitmap.close();rp.close()
-                pages.append({'width':page.width,'height':page.height,'objects':objects,'counts':dict(Counter(o['kind'] for o in objects)),'image':'data:image/png;base64,'+base64.b64encode(out.getvalue()).decode()})
+                base_image=bitmap.to_pil().copy()
+                out=io.BytesIO();base_image.save(out,format='PNG')
+                bitmap.close()
+                annotation_image=None
+                if any(o['kind']=='annotation' for o in objects):
+                    from PIL import ImageChops
+                    marked=rp.render(scale=min(1.1,2200/max(page.width,page.height)),draw_annots=True)
+                    annotated=marked.to_pil().convert('RGB')
+                    # Keep only annotation-rendered pixels, preserving original appearance.
+                    difference=ImageChops.difference(annotated,base_image.convert('RGB'))
+                    channels=difference.split()
+                    mask=ImageChops.lighter(ImageChops.lighter(channels[0],channels[1]),channels[2]).point(lambda v:255 if v else 0)
+                    annotated.putalpha(mask)
+                    annotation_out=io.BytesIO();annotated.save(annotation_out,format='PNG')
+                    annotation_image='data:image/png;base64,'+base64.b64encode(annotation_out.getvalue()).decode()
+                    marked.close()
+                rp.close()
+                pages.append({'width':page.width,'height':page.height,'objects':objects,'counts':dict(Counter(o['kind'] for o in objects)),'annotationImage':annotation_image,'image':'data:image/png;base64,'+base64.b64encode(out.getvalue()).decode()})
                 page.close()
     finally:
         renderer.close()

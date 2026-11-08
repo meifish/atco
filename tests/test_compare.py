@@ -40,6 +40,11 @@ class ComparisonTests(unittest.TestCase):
         out=io.BytesIO();w.write(out)
         p=compare(source,out.getvalue())['pages'][0]
         self.assertEqual([o['kind'] for o in p['after']['changes']],['annotation'])
+        self.assertIsNone(p['before']['annotationImage'])
+        self.assertTrue(p['after']['annotationImage'].startswith('data:image/png;base64,'))
+        import base64
+        layer=Image.open(io.BytesIO(base64.b64decode(p['after']['annotationImage'].split(',')[1])))
+        self.assertIsNotNone(layer.getchannel('A').getbbox())
     def test_rotation(self):
         p=PdfReader(io.BytesIO(pdf())).pages[0];p.rotate(270)
         self.assertEqual(annot_box([20,30,60,70],p),[130,240,170,280])
