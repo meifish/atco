@@ -1,10 +1,7 @@
 """Local PDF object extraction and multiset comparison; no remote services."""
-import base64
 import io
-import math
 from collections import Counter
 import pdfplumber
-import pypdfium2 as pdfium
 from pypdf import PdfReader
 
 MAX_PAGES = 30
@@ -54,55 +51,47 @@ def extract(data):
         raise ValueError(f'每份 PDF 須為 1–{MAX_PAGES} 頁。')
     pages=[]
     total=0
-    renderer=pdfium.PdfDocument(data)
-    try:
-        with pdfplumber.open(io.BytesIO(data)) as pdf:
-            for index,page in enumerate(pdf.pages):
-                objects=[]
-                word_map={}
-                for word in page.extract_words(return_chars=True):
-                    for char in word['chars']:
-                        word_map[id(char)] = {'text':word['text'],'box':[word['x0'],word['top'],word['x1'],word['bottom']]}
-                for kind in ('line','curve','rect','char','image'):
-                    for item in page.objects.get(kind,[]):
-                        o={'kind':kind,'box':[item['x0'],item['top'],item['x1'],item['bottom']]}
-                        if kind=='char':
-                            o.update(word=word_map.get(id(item)),text=item['text'],matrix=item.get('matrix'),style=[item.get('fontname'),item.get('size'),item.get('non_stroking_color')])
-                        elif kind=='image':
-                            import hashlib
-                            o.update(text=hashlib.sha256(item['stream'].get_data()).hexdigest())
-                        else:
-                            o.update(path=item.get('path') or [('m',p) if i==0 else ('l',p) for i,p in enumerate(item.get('pts',[]))],style=[item.get('linewidth'),item.get('stroke'),item.get('fill'),item.get('stroking_color'),item.get('non_stroking_color'),item.get('dash'),item.get('evenodd')])
-                        objects.append(o)
-                for ref in reader.pages[index].get('/Annots',[]):
-                    a=ref.get_object()
-                    if a.get('/Subtype') in ('/Link','/Popup','/Widget') or not a.get('/Rect'): continue
-                    objects.append({'kind':'annotation','box':annot_box(a['/Rect'],reader.pages[index]),'text':str(a.get('/Contents','')),'style':str([a.get(k) for k in ('/Subtype','/C','/Vertices','/L','/InkList','/DA','/BS')])})
-                total += len(objects)
-                if total > MAX_OBJECTS: raise ValueError('圖面物件過多，請拆成較小的 PDF 再比對。')
-                rp=renderer[index]
-                bitmap=rp.render(scale=min(1.1,2200/max(page.width,page.height)),draw_annots=False)
-                base_image=bitmap.to_pil().copy()
-                out=io.BytesIO();base_image.save(out,format='PNG')
-                bitmap.close()
-                annotation_image=None
-                if any(o['kind']=='annotation' for o in objects):
-                    from PIL import ImageChops
-                    marked=rp.render(scale=min(1.1,2200/max(page.width,page.height)),draw_annots=True)
-                    annotated=marked.to_pil().convert('RGB')
-                    # Keep only annotation-rendered pixels, preserving original appearance.
-                    difference=ImageChops.difference(annotated,base_image.convert('RGB'))
-                    channels=difference.split()
-                    mask=ImageChops.lighter(ImageChops.lighter(channels[0],channels[1]),channels[2]).point(lambda v:255 if v else 0)
-                    annotated.putalpha(mask)
-                    annotation_out=io.BytesIO();annotated.save(annotation_out,format='PNG')
-                    annotation_image='data:image/png;base64,'+base64.b64encode(annotation_out.getvalue()).decode()
-                    marked.close()
-                rp.close()
-                pages.append({'width':page.width,'height':page.height,'objects':objects,'counts':dict(Counter(o['kind'] for o in objects)),'annotationImage':annotation_image,'image':'data:image/png;base64,'+base64.b64encode(out.getvalue()).decode()})
-                page.close()
-    finally:
-        renderer.close()
+    with pdfplumber.open(io.BytesIO(data)) as pdf:
+        for index,page in enumerate(pdf.pages):
+            objects=[]
+            source_page = reader.pages[index]
+            media_x, media_y = page.mediabox[:2]
+
+            def local_box(item):
+                return [item['x0'] - media_x, item['top'] - media_y,
+                        item['x1'] - media_x, item['bottom'] - media_y]
+
+            word_map={}
+            for word in page.extract_words(return_chars=True):
+                for char in word['chars']:
+                    word_map[id(char)] = {'text':word['text'],'box':local_box(word)}
+            for kind in ('line','curve','rect','char','image'):
+                for item in page.objects.get(kind,[]):
+                    o={'kind':kind,'box':local_box(item)}
+                    if kind=='char':
+                        o.update(word=word_map.get(id(item)),text=item['text'],matrix=item.get('matrix'),style=[item.get('fontname'),item.get('size'),item.get('non_stroking_color')])
+                    elif kind=='image':
+                        import hashlib
+                        o.update(text=hashlib.sha256(item['stream'].get_data()).hexdigest())
+                    else:
+                        path = item.get('path') or [('m' if i == 0 else 'l', p)
+                                                   for i, p in enumerate(item.get('pts', []))]
+                        o.update(path=[(cmd, *((x - media_x, y - media_y) for x, y in points))
+                                       for cmd, *points in path],style=[item.get('linewidth'),item.get('stroke'),item.get('fill'),item.get('stroking_color'),item.get('non_stroking_color'),item.get('dash'),item.get('evenodd')])
+                    objects.append(o)
+            for ref in source_page.get('/Annots',[]):
+                a=ref.get_object()
+                if a.get('/Subtype') in ('/Link','/Popup','/Widget') or not a.get('/Rect'): continue
+                objects.append({'kind':'annotation','box':annot_box(a['/Rect'],source_page),'text':str(a.get('/Contents','')),'style':str([a.get(k) for k in ('/Subtype','/C','/Vertices','/L','/InkList','/DA','/BS')])})
+            total += len(objects)
+            if total > MAX_OBJECTS: raise ValueError('圖面物件過多，請拆成較小的 PDF 再比對。')
+            pages.append({
+                'width': page.width, 'height': page.height,
+                'mediaBox': list(map(float, source_page.mediabox)),
+                'rotation': page.rotation,
+                'objects': objects, 'counts': dict(Counter(o['kind'] for o in objects)),
+            })
+            page.close()
     return pages
 
 def readable_changes(removed, added):

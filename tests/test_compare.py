@@ -40,11 +40,30 @@ class ComparisonTests(unittest.TestCase):
         out=io.BytesIO();w.write(out)
         p=compare(source,out.getvalue())['pages'][0]
         self.assertEqual([o['kind'] for o in p['after']['changes']],['annotation'])
-        self.assertIsNone(p['before']['annotationImage'])
-        self.assertTrue(p['after']['annotationImage'].startswith('data:image/png;base64,'))
-        import base64
-        layer=Image.open(io.BytesIO(base64.b64decode(p['after']['annotationImage'].split(',')[1])))
-        self.assertIsNotNone(layer.getchannel('A').getbbox())
+        self.assertEqual(p['after']['changes'][0]['box'], [20, 160, 70, 180])
+        self.assertEqual(p['after']['changes'][0]['text'], 'review')
+
+    def test_structured_diff_for_offset_rotated_media_and_crop(self):
+        writer = PdfWriter()
+        writer.append(io.BytesIO(pdf()))
+        page = writer.pages[0]
+        page.mediabox.lower_left = (10, 15)
+        page.mediabox.upper_right = (310, 215)
+        page.cropbox.lower_left = (15, 25)
+        page.cropbox.upper_right = (250, 195)
+        page.rotate(90)
+        out = io.BytesIO()
+        writer.write(out)
+        before = compare(out.getvalue(), pdf(line=False))['pages'][0]['before']
+        self.assertEqual(before['mediaBox'], [10, 15, 310, 215])
+        self.assertEqual(before['rotation'], 90)
+        self.assertEqual((before['width'], before['height']), (200, 300))
+        line = next(obj for obj in before['changes'] if obj['kind'] == 'line')
+        self.assertEqual(line['box'], [35, 10, 35, 170])
+        self.assertEqual(line['path'], [('m', (35, 10)), ('l', (35, 170))])
+        self.assertNotIn('image', before)
+        self.assertNotIn('annotationImage', before)
+
     def test_rotation(self):
         p=PdfReader(io.BytesIO(pdf())).pages[0];p.rotate(270)
         self.assertEqual(annot_box([20,30,60,70],p),[130,240,170,280])

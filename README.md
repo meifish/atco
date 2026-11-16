@@ -4,12 +4,13 @@
 
 ## 啟動
 
-需要 Python 3.10+。macOS 可在終端機執行 `./start.command`，或：
+需要 Python 3.10+、Node.js 22.13+（或 24+）及支援現代 JavaScript 模組的瀏覽器。macOS 可在終端機執行 `./start.command`，或：
 
 ```sh
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+npm ci --omit=dev
 python server.py
 ```
 
@@ -23,7 +24,7 @@ python server.py
 2. 按「解析並比對」，等待本機解析完成。
 3. 切換頁面；紅色代表修改前，綠色代表修改後。
 4. 點選左側差異區域，兩側會同步定位。可同步縮放、捲動。
-5. 關閉「淡化原圖」可隱藏共通背景；勾選「包含批註」可顯示批註差異範圍。
+5. 「顯示」可切換原圖＋差異、淡化原圖及只顯示差異。勾選「包含批註」會繪製 PDF 批註並標出有差異的批註。
 6. 展開「PDF 解析資訊」查看每頁的物件數量。
 
 ## 比對方式及限制
@@ -33,7 +34,8 @@ python server.py
 - 圖片比較解碼後資料雜湊及位置；批註比較範圍、內容及主要樣式。
 - 不是二進位 PDF diff，也不是 OCR 或 CAD 元件識別。改動表示為移除舊物件及新增新物件，清單依物件種類及相近位置推定屬性配對，可能有誤配，需配合圖面確認。文字會組合為詞，顯示修改前後內容。
 - 尚未實作自動對齊、頁面重排配對、圖層顯示狀態、完整裁切或透明度語意。圖面整體位移會產生大量差異。浮點量化邊界也可能造成微小誤報。
-- 向量依解析路徑重新繪製；文字與圖片採用原圖局部影像，可能連帶呈現範圍內重疊物件。預覽最長邊 2,200 px。批註預設開啟，以 PDF 渲染取得原始文字、底色與箭頭外觀，差異處加上虛線框。
+- 比對 API 回傳各頁的 MediaBox、旋轉角度、物件座標與差異資料。瀏覽器使用 PDF.js 顯示原始檔，並依實際 CropBox 放置 SVG 標示。只顯示差異時，向量以解析路徑繪製，文字、圖片與批註以原圖局部呈現。裁切區內可能同時顯示重疊的共通物件。
+- 總覽預覽的最長邊最多 1,200 px。放大後依可見範圍繪製 256 CSS px 的區塊，每個區塊最多 1,024 × 1,024 像素。取樣密度在上限內以至少 300 DPI 或螢幕像素密度為目標。平移和縮放沿用比對結果。來源掃描圖的細節仍取決於原始解析度。
 - 以空間網格將差異分組供導覽，區域數不等於修改數。複雜 CAD 匯出可能以多個路徑表達單一元素。
 - 解析有頁數及物件數限制；目前單一請求依序處理，尚無取消或串流進度。大型文件可能需要數分鐘。
 
@@ -41,8 +43,12 @@ python server.py
 
 ```sh
 pip install -r requirements-dev.txt
+npm ci
 python -m unittest discover -s tests -v
 node tests/test_attributes.cjs
+node --test tests/test_viewer_layout.mjs
+npx playwright install chromium
+PYTHON=python node --test tests/test_viewer_browser.mjs
 ```
 
 合成 PDF 測試包含相同文件、文字／線段變更、新增頁面、圖片變更、批註、頁面旋轉與重複物件處理。
