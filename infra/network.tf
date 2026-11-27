@@ -93,5 +93,7 @@ resource "aws_service_discovery_service" "web" {
       ttl  = 10
     }
   }
-  health_check_custom_config {}
+  # No health_check_custom_config: AWS no longer returns the empty block, so
+  # keeping it makes every plan replace this service. ECS deregisters stopped
+  # tasks itself.
 }
