@@ -46,9 +46,9 @@ def annot_box(rect, page):
 def extract(data):
     reader=PdfReader(io.BytesIO(data))
     if reader.is_encrypted:
-        raise ValueError('這份 PDF 有密碼保護，請先解鎖再上傳。')
+        raise ValueError('This PDF is password-protected. Remove the password and upload it again.')
     if not 1 <= len(reader.pages) <= MAX_PAGES:
-        raise ValueError(f'每份 PDF 須為 1–{MAX_PAGES} 頁。')
+        raise ValueError(f'Each PDF must have 1–{MAX_PAGES} pages.')
     pages=[]
     total=0
     with pdfplumber.open(io.BytesIO(data)) as pdf:
@@ -84,7 +84,7 @@ def extract(data):
                 if a.get('/Subtype') in ('/Link','/Popup','/Widget') or not a.get('/Rect'): continue
                 objects.append({'kind':'annotation','box':annot_box(a['/Rect'],source_page),'text':str(a.get('/Contents','')),'style':str([a.get(k) for k in ('/Subtype','/C','/Vertices','/L','/InkList','/DA','/BS')])})
             total += len(objects)
-            if total > MAX_OBJECTS: raise ValueError('圖面物件過多，請拆成較小的 PDF 再比對。')
+            if total > MAX_OBJECTS: raise ValueError('The drawing has too many objects. Split it into smaller PDFs and try again.')
             pages.append({
                 'width': page.width, 'height': page.height,
                 'mediaBox': list(map(float, source_page.mediabox)),

@@ -1,11 +1,11 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const source=fs.readFileSync('static/app.js','utf8');
-const context={names:{char:'文字字元',line:'直線'},esc:s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))};vm.createContext(context);vm.runInContext(source.slice(source.indexOf('function attributeSummary(')),context);
+const context={names:{char:'Text',line:'Line'},esc:s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))};vm.createContext(context);vm.runInContext(source.slice(source.indexOf('function attributeSummary(')),context);
 const text=(value,box=[0,0,20,10])=>({kind:'char',text:value,box,style:['font',12,[0,0,0]]});
 const render=(a,b)=>context.attributeSummary({objects:{before:a,after:b}});
 assert.match(render([text('text1')],[text('text2')]),/text1[\s\S]*text2/);
 assert.match(render([{kind:'line',box:[0,0,20,10],style:[.36,true,false,0,0]}],[{kind:'line',box:[0,0,20,10],style:[.72,true,false,0,0]}]),/0.36[\s\S]*0.72/);
-assert.match(render([text('old')],[text('new',[200,0,220,10])]),/移除[\s\S]*新增/);
+assert.match(render([text('old')],[text('new',[200,0,220,10])]),/removed[\s\S]*added/);
 assert.ok(!render([text('<script>')],[text('new')]).includes('<script>'));
 console.log('4 attribute display tests passed');
 const annotation=(value,box)=>({kind:'annotation',text:value,box,style:'FreeText'});

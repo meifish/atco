@@ -7,8 +7,8 @@ from .storage import job_key
 
 log = logging.getLogger(__name__)
 
-PARSE_ERROR = '無法解析此 PDF。檔案可能損壞或包含不支援的內容，請重新匯出後再試。'
-MEMORY_ERROR = '比對所需記憶體超過上限，請拆分檔案或聯絡管理員調整設定。'
+PARSE_ERROR = 'Could not parse this PDF. The file may be damaged or contain unsupported content. Export it again and retry.'
+MEMORY_ERROR = 'The comparison ran out of memory. Split the files, or ask an administrator to raise the limit.'
 
 
 def run_job(store, storage, user_id, job_id, compare=None):
