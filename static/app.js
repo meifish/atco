@@ -8,13 +8,55 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 function selectFile(side,file){if(!file)return;files[side]=file;$(side+'Name').textContent=file.name;updateButton();}
 function updateButton(){$('compare').disabled=!files.before||!files.after;}
 for(const side of ['before','after']){const input=$(side+'File'),drop=$(side+'Drop');input.onchange=()=>selectFile(side,input.files[0]);drop.ondragover=e=>{e.preventDefault();drop.classList.add('drag');};drop.ondragleave=()=>drop.classList.remove('drag');drop.ondrop=e=>{e.preventDefault();drop.classList.remove('drag');if(!$('compare').dataset.busy)selectFile(side,e.dataTransfer.files[0]);};}
-$('compare').onclick=async()=>{
- const before=files.before,after=files.after;if(!before||!after)return;
- if(before.size+after.size>80*1024*1024){$('status').textContent='兩份檔案合計不可超過 80 MB。';return;}
- $('compare').disabled=true;$('compare').dataset.busy='1';$('beforeFile').disabled=$('afterFile').disabled=true;
- $('status').className='busy';$('status').textContent='正在本機解析文字、向量線條與批註，再比對物件… 大型施工圖可能需要一至數分鐘。';$('results').hidden=true;$('empty').hidden=true;
- try{const response=await fetch('/api/compare',{method:'POST',headers:{'Content-Type':'application/octet-stream','X-Before-Length':String(before.size)},body:new Blob([before,after])});const data=await response.json();if(!response.ok)throw Error(data.error||'比對失敗');viewer ??= await import('/viewer.mjs');
- const next = {before: viewer.openPdf(before), after: viewer.openPdf(after)};
+let auth, appConfig, polling = 0;
+const VIEW_KEY = 'redline-diff:view';
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const api = (path, options) => auth.apiFetch(path, options);
+async function apiJson(path, options) {
+ const response = await api(path, options);
+ if (response.status === 204) return null;
+ const data = await response.json().catch(() => ({}));
+ if (!response.ok) throw Error(data.error || '比對失敗');
+ return data;
+}
+async function upload(form, file) {
+ const body = new FormData();
+ for (const [name, value] of Object.entries(form.fields)) body.append(name, value);
+ body.append('file', file);  // S3 requires the file to be the last field
+ const response = await fetch(form.url, { method: 'POST', body });
+ if (!response.ok) throw Error('上傳失敗，請檢查網路後再試。');
+}
+async function download(url, kind) {
+ const response = await fetch(url);
+ if (!response.ok) throw Error('無法取得比對結果，可能已過期或已登出清除。');
+ return kind === 'json' ? response.json() : response.blob();
+}
+function setBusy(busy, message) {
+ if (busy) { $('compare').disabled = true; $('compare').dataset.busy = '1'; }
+ else { delete $('compare').dataset.busy; updateButton(); }
+ $('beforeFile').disabled = $('afterFile').disabled = busy;
+ $('status').className = busy ? 'busy' : '';
+ $('status').textContent = message || '';
+}
+// Polls the job until it finishes. Polling is not user activity, so it never extends the session.
+async function waitForJob(jobId) {
+ const run = ++polling;
+ for (let delay = 1500; ; delay = Math.min(delay * 1.3, 5000)) {
+   const job = await apiJson('/api/jobs/' + jobId);
+   if (run !== polling) return null;
+   if (job.status === 'done') return job;
+   if (job.status === 'failed' || job.status === 'cancelled') throw Error(job.error || '比對失敗');
+   $('status').textContent = job.status === 'pending'
+     ? '已送出，等待比對開始…'
+     : '正在解析文字、向量線條與批註，再比對物件… 大型施工圖可能需要一至數分鐘。';
+   await sleep(delay);
+ }
+}
+async function showResult(job, localFiles, view) {
+ const data = await download(job.result_url, 'json');
+ const blobs = localFiles || Object.fromEntries(await Promise.all(sides.map(async side => [side, await download(job[side + '_url'])])));
+ viewer ??= await import('/viewer.mjs');
+ const next = {before: viewer.openPdf(blobs.before), after: viewer.openPdf(blobs.after)};
  try {
    await Promise.all(sides.map(side => next[side].document));
  } catch (error) {
@@ -24,11 +66,66 @@ $('compare').onclick=async()=>{
  clearPanes();
  if (pdfs) await Promise.allSettled(sides.map(side => pdfs[side].destroy()));
  pdfs = next;
- result=data;result.filenames={before:before.name,after:after.name};pageIndex=0;zoom=1;selectedRegion=null;resetScroll();
- $('pageSelect').innerHTML=result.pages.map((_,i)=>`<option value="${i}">第 ${i+1} 頁</option>`).join('');$('results').hidden=false;$('status').textContent='';await render();
- }catch(e){$('status').className='';$('status').textContent=e.message||'無法連線至本機服務，請確認網站已啟動。';$('empty').hidden=false;}
- finally{delete $('compare').dataset.busy;$('beforeFile').disabled=$('afterFile').disabled=false;updateButton();}
+ result = data; result.jobId = job.job_id; result.filenames = job.filenames;
+ pageIndex = 0; zoom = 1; selectedRegion = null; resetScroll();
+ if (view?.jobId === job.job_id) {
+   pageIndex = Math.min(Math.max(0, Number(view.page) || 0), result.pages.length - 1);
+   zoom = Math.min(8, Math.max(.5, Number(view.zoom) || 1));
+   if (['original', 'faded', 'diff'].includes(view.mode)) $('mode').value = view.mode;
+   if (typeof view.annotations === 'boolean') $('annotations').checked = view.annotations;
+ }
+ $('pageSelect').innerHTML = result.pages.map((_, i) => `<option value="${i}">第 ${i + 1} 頁</option>`).join('');
+ $('pageSelect').value = String(pageIndex);
+ $('results').hidden = false; $('empty').hidden = true; $('status').textContent = '';
+ await render();
+}
+function saveView() {
+ if (!result?.jobId) return;
+ localStorage.setItem(VIEW_KEY, JSON.stringify({ jobId: result.jobId, page: pageIndex, zoom,
+   mode: $('mode').value, annotations: $('annotations').checked }));
+}
+function readView() { try { return JSON.parse(localStorage.getItem(VIEW_KEY)); } catch { return null; } }
+for (const type of ['click', 'change']) document.addEventListener(type, () => setTimeout(saveView), true);
+$('compare').onclick=async()=>{
+ const before=files.before,after=files.after;if(!before||!after)return;
+ if(before.size+after.size>80*1024*1024){$('status').textContent='兩份檔案合計不可超過 80 MB。';return;}
+ setBusy(true, '正在上傳檔案…'); $('results').hidden = true; $('empty').hidden = true;
+ try {
+   const { job_id, uploads } = await apiJson('/api/uploads', { method: 'POST' });
+   await Promise.all(sides.map(side => upload(uploads[side], files[side])));
+   await apiJson('/api/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+     body: JSON.stringify({ job_id, filenames: { before: before.name, after: after.name } }) });
+   const job = await waitForJob(job_id);
+   if (job) await showResult(job, { before, after });
+ } catch (e) {
+   $('status').className=''; $('status').textContent=e.message||'無法連線至服務，請稍後再試。'; $('empty').hidden=false;
+ } finally { delete $('compare').dataset.busy; $('beforeFile').disabled=$('afterFile').disabled=false; updateButton(); if ($('status').className === 'busy') $('status').className = ''; }
 };
+// After a reload, bring back the last comparison (or keep waiting for one still running).
+async function restore() {
+ const last = await apiJson('/api/me/last-result').catch(() => null);
+ if (!last || last.status === 'failed' || last.status === 'cancelled') return;
+ setBusy(true, '正在還原上一次的比對結果…'); $('empty').hidden = true;
+ try {
+   const job = last.status === 'done' ? last : await waitForJob(last.job_id);
+   if (job) await showResult(job, null, readView());
+ } catch (e) { $('status').className = ''; $('status').textContent = e.message; $('empty').hidden = false; }
+ finally { const message = $('status').className === 'busy' ? '' : $('status').textContent; setBusy(false, message); }
+}
+(async () => {
+ try {
+   appConfig = await (await fetch('/api/config')).json();
+   auth = await import('/auth.js');
+   const session = await auth.init(appConfig);
+   if (!session.signedIn) return;
+   if (appConfig.auth) {
+     $('modeBadge').innerHTML = '<i></i> 公司內部 · 僅限 Tailscale';
+     $('userEmail').textContent = session.email;
+     $('logout').hidden = false;
+   }
+   await restore();
+ } catch (e) { $('status').textContent = '無法連線至服務，請確認網站已啟動。'; }
+})();
 function changes(page){return(page?.changes||[]).filter(o=>$('annotations').checked||o.kind!=='annotation');}
 function vector(o,color,highlight){const width=Math.max(.65,Number(o.style?.[0])||0),fill=o.style?.[2]?color:'none';let d=(o.path||[]).map(seg=>seg[0].toUpperCase()+' '+seg.slice(1).flat().join(' ')).join(' ');if(o.kind==='rect')d+=' Z';return `<path d="${esc(d)}" fill="${fill}" fill-opacity="${highlight ? .2 : 1}" fill-rule="${o.style?.[6]?'evenodd':'nonzero'}" stroke="${(highlight || o.style?.[1])?color:'none'}" stroke-width="${width}"/>`;}
 function diagram(page, side, box, annotationRegions) {

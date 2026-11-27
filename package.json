@@ -1,1 +1,1 @@
-{"name":"atco-drawing-diff","private":true,"dependencies":{"pdfjs-dist":"6.5.438"},"devDependencies":{"playwright":"1.65.0"}}
+{"name":"redline-diff","private":true,"dependencies":{"pdfjs-dist":"6.5.438"},"devDependencies":{"playwright":"1.65.0"}}

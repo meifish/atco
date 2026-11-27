@@ -1,0 +1,7 @@
+# Comparison Lambda (container image, arm64), triggered by SQS.
+FROM public.ecr.aws/lambda/python:3.13
+COPY requirements.txt ${LAMBDA_TASK_ROOT}/
+RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt
+COPY compare.py ${LAMBDA_TASK_ROOT}/
+COPY redline_diff ${LAMBDA_TASK_ROOT}/redline_diff
+CMD ["redline_diff.lambda_handler.handler"]
