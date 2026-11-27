@@ -127,7 +127,7 @@ for name, label in [('before', 'old'), ('after', 'new')]:
         await before.locator('.pdf-layer').waitFor();
         assert.match(await before.locator('.pdf-layer').evaluate(layer => getComputedStyle(layer).clipPath), /before-clips/);
         await page.locator('#pageSelect').selectOption('1');
-        await before.getByText('此版本沒有對應頁面').waitFor();
+        await before.getByText('No matching page in this version').waitFor();
         await page.locator('#afterCanvas .pdf-preview').waitFor();
         assert.deepEqual(errors, []);
     } finally {

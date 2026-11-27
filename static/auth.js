@@ -5,7 +5,7 @@
 // - Access token lasts 1 hour. With 5 minutes left it is renewed silently if the
 //   user did something (mouse, keys, wheel, page or zoom changes) in the last 4 hours.
 //   Background polling is not activity.
-// - After 4 hours idle a "即將登出" prompt appears; no answer in 2 minutes logs out.
+// - After 4 hours idle a "Still there?" prompt appears; no answer in 2 minutes logs out.
 // - The Cognito refresh token (12 hours) is the hard cap.
 // - Logout cancels running jobs and deletes the user's data on the server, revokes
 //   the refresh token, clears browser state and ends the Cognito session.
@@ -103,12 +103,12 @@ async function accessToken() {
 export async function apiFetch(path, options = {}) {
     if (!config?.auth) return fetch(path, options);
     let token;
-    try { token = await accessToken(); } catch { sessionEnded(); throw Error('登入已過期，請重新登入。'); }
+    try { token = await accessToken(); } catch { sessionEnded(); throw Error('Your session has expired. Please sign in again.'); }
     const send = t => fetch(path, { ...options, headers: { ...(options.headers || {}), Authorization: 'Bearer ' + t } });
     let response = await send(token);
     if (response.status === 401) {
         try { response = await send((await refresh()).access_token); }
-        catch { sessionEnded(); throw Error('登入已過期，請重新登入。'); }
+        catch { sessionEnded(); throw Error('Your session has expired. Please sign in again.'); }
     }
     return response;
 }
@@ -121,7 +121,7 @@ function clearBrowserState() {
 function sessionEnded() {
     if (loggingOut) return;
     clearBrowserState();
-    showSignIn('登入已過期，請重新登入。');
+    showSignIn('Your session has expired. Please sign in again.');
 }
 
 export async function logout() {
@@ -184,7 +184,7 @@ export async function init(appConfig) {
         try { await refresh(); } catch { sessionEnded(); }
     };
     $('idleLogout').onclick = () => { clearInterval(promptTimer); $('idleDialog').close(); logout(); };
-    try { await finishLogin(); } catch { showSignIn('登入失敗，請再試一次。'); return { signedIn: false }; }
+    try { await finishLogin(); } catch { showSignIn('Sign-in failed. Please try again.'); return { signedIn: false }; }
     if (!tokens()) { showSignIn(); return { signedIn: false }; }
     for (const type of ['pointerdown', 'keydown', 'wheel']) addEventListener(type, markActivity, { capture: true, passive: true });
     setInterval(tick, 15000);

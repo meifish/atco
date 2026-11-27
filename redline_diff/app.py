@@ -69,7 +69,7 @@ def create_app(settings=None, store=None, storage=None, queue=None, verifier=Non
     @app.middleware('http')
     async def headers(request: Request, call_next):
         if request.method == 'POST' and request.headers.get('sec-fetch-site') == 'cross-site':
-            return error(403, '不允許跨站請求。')
+            return error(403, 'Cross-site requests are not allowed.')
         response = await call_next(request)
         response.headers.setdefault('Cache-Control', 'no-store')
         response.headers['X-Content-Type-Options'] = 'nosniff'
@@ -81,11 +81,11 @@ def create_app(settings=None, store=None, storage=None, queue=None, verifier=Non
         try:
             return verifier.verify(request.headers.get('authorization'))
         except AuthError:
-            raise HTTPException(401, '登入已過期，請重新登入。')
+            raise HTTPException(401, 'Your session has expired. Please sign in again.')
 
     @app.exception_handler(HTTPException)
     async def http_error(request, exc):
-        return error(exc.status_code, exc.detail if isinstance(exc.detail, str) else '請求失敗')
+        return error(exc.status_code, exc.detail if isinstance(exc.detail, str) else 'Request failed.')
 
     # ---- static site -------------------------------------------------------
     def static_route(path, name, kind):
@@ -134,31 +134,31 @@ def create_app(settings=None, store=None, storage=None, queue=None, verifier=Non
             names = body.get('filenames') or {}
             filenames = {side: str(names.get(side) or side + '.pdf')[:255] for side in SIDES}
         except Exception:
-            return error(400, '請求格式錯誤。')
+            return error(400, 'Invalid request.')
         if not isinstance(job_id, str) or not JOB_ID.match(job_id):
-            return error(400, '請求格式錯誤。')
+            return error(400, 'Invalid request.')
         keys = {side: job_key(user.id, job_id, side + '.pdf') for side in SIDES}
         sizes = [storage.size(keys[side]) for side in SIDES]
         if not all(sizes):
-            return error(400, '請先上傳兩份 PDF。')
+            return error(400, 'Upload both PDFs first.')
         if sum(sizes) > MAX_TOTAL_BYTES:
-            return error(400, '請選擇兩份 PDF，合計大小不可超過 80 MB。')
+            return error(400, 'Choose two PDFs, 80 MB or less in total.')
         if not all(b'%PDF-' in storage.read(keys[side], 1024) for side in SIDES):
-            return error(400, '檔案格式不是有效的 PDF。')
+            return error(400, 'The file is not a valid PDF.')
         if not store.create_job(user.id, job_id, keys['before'], keys['after'], filenames):
-            return error(409, '這個比對工作已經建立。')
+            return error(409, 'This comparison has already been submitted.')
         queue.send(user.id, job_id)
         return {'job_id': job_id, 'status': 'pending'}
 
     def job_view(user, job):
         now = time.time()
         if job['status'] == 'running' and now - job.get('started_at', now) > settings.job_stale_seconds:
-            message = '比對超過執行時間或記憶體上限。請拆分檔案後再試。'
+            message = 'The comparison exceeded the time or memory limit. Split the files and try again.'
             if store.finish_job(user.id, job['job_id'], 'failed', error=message,
                                 expect_started_at=job['started_at']):
                 job = dict(job, status='failed', error=message)
         elif job['status'] == 'pending' and now - job['created_at'] > PENDING_STALE_SECONDS:
-            job = dict(job, status='failed', error='比對工作排隊逾時，請重新送出。')
+            job = dict(job, status='failed', error='The comparison waited too long in the queue. Please submit it again.')
         view = {k: job.get(k) for k in ('job_id', 'status', 'error', 'filenames', 'created_at')}
         if job['status'] == 'done':
             view['result_url'] = storage.download_url(job['result_key'])
@@ -170,7 +170,7 @@ def create_app(settings=None, store=None, storage=None, queue=None, verifier=Non
     def get_job(job_id: str, user=Depends(current_user)):
         job = JOB_ID.match(job_id) and store.get_job(user.id, job_id)
         if not job:
-            return error(404, '找不到這個比對工作，可能已過期或已登出清除。')
+            return error(404, 'Comparison not found. It may have expired or been deleted when you signed out.')
         return job_view(user, job)
 
     @app.get('/api/me/last-result')
@@ -196,17 +196,17 @@ def create_app(settings=None, store=None, storage=None, queue=None, verifier=Non
                 expires, token = str(form.get('expires', '0')), str(form.get('token', ''))
                 upload = form.get('file')
                 if not storage.verify(token, expires, 'upload', key, max_bytes) or upload is None:
-                    return error(403, '上傳網址無效或已過期。')
+                    return error(403, 'The upload link is invalid or has expired.')
                 data = await upload.read()
             if not 0 < len(data) <= int(max_bytes):
-                return error(400, '檔案大小超過上限。')
+                return error(400, 'The file is too large.')
             storage.put(key, data, 'application/pdf')
             return Response(status_code=204)
 
         @app.get('/local-storage/object', include_in_schema=False)
         async def local_object(key: str, expires: str, token: str):
             if not storage.verify(token, expires, 'download', key) or storage.size(key) is None:
-                return error(403, '下載網址無效或已過期。')
+                return error(403, 'The download link is invalid or has expired.')
             kind = 'application/pdf' if key.endswith('.pdf') else 'application/json'
             return FileResponse(storage._path(key), media_type=kind)
 

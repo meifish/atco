@@ -3,7 +3,7 @@ const sides = ['before', 'after'];
 const panes = {};
 let viewer, pdfs, renderVersion = 0;
 const files={before:null,after:null};let result=null,pageIndex=0,zoom=1,regions=[],syncing=false,selectedRegion=null;
-const names={line:'直線',curve:'向量路徑',rect:'矩形',char:'文字',image:'圖片',annotation:'批註'};
+const names={line:'Line',curve:'Vector path',rect:'Rectangle',char:'Text',image:'Image',annotation:'Annotation'};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function selectFile(side,file){if(!file)return;files[side]=file;$(side+'Name').textContent=file.name;updateButton();}
 function updateButton(){$('compare').disabled=!files.before||!files.after;}
@@ -16,7 +16,7 @@ async function apiJson(path, options) {
  const response = await api(path, options);
  if (response.status === 204) return null;
  const data = await response.json().catch(() => ({}));
- if (!response.ok) throw Error(data.error || '比對失敗');
+ if (!response.ok) throw Error(data.error || 'Comparison failed.');
  return data;
 }
 async function upload(form, file) {
@@ -24,11 +24,11 @@ async function upload(form, file) {
  for (const [name, value] of Object.entries(form.fields)) body.append(name, value);
  body.append('file', file);  // S3 requires the file to be the last field
  const response = await fetch(form.url, { method: 'POST', body });
- if (!response.ok) throw Error('上傳失敗，請檢查網路後再試。');
+ if (!response.ok) throw Error('Upload failed. Check your connection and try again.');
 }
 async function download(url, kind) {
  const response = await fetch(url);
- if (!response.ok) throw Error('無法取得比對結果，可能已過期或已登出清除。');
+ if (!response.ok) throw Error('Could not load the result. It may have expired or been deleted when you signed out.');
  return kind === 'json' ? response.json() : response.blob();
 }
 function setBusy(busy, message) {
@@ -45,10 +45,10 @@ async function waitForJob(jobId) {
    const job = await apiJson('/api/jobs/' + jobId);
    if (run !== polling) return null;
    if (job.status === 'done') return job;
-   if (job.status === 'failed' || job.status === 'cancelled') throw Error(job.error || '比對失敗');
+   if (job.status === 'failed' || job.status === 'cancelled') throw Error(job.error || 'Comparison failed.');
    $('status').textContent = job.status === 'pending'
-     ? '已送出，等待比對開始…'
-     : '正在解析文字、向量線條與批註，再比對物件… 大型施工圖可能需要一至數分鐘。';
+     ? 'Queued. Waiting for the comparison to start…'
+     : 'Parsing text, vectors and annotations, then comparing objects… Large drawings can take a few minutes.';
    await sleep(delay);
  }
 }
@@ -74,7 +74,7 @@ async function showResult(job, localFiles, view) {
    if (['original', 'faded', 'diff'].includes(view.mode)) $('mode').value = view.mode;
    if (typeof view.annotations === 'boolean') $('annotations').checked = view.annotations;
  }
- $('pageSelect').innerHTML = result.pages.map((_, i) => `<option value="${i}">第 ${i + 1} 頁</option>`).join('');
+ $('pageSelect').innerHTML = result.pages.map((_, i) => `<option value="${i}">Page ${i + 1}</option>`).join('');
  $('pageSelect').value = String(pageIndex);
  $('results').hidden = false; $('empty').hidden = true; $('status').textContent = '';
  await render();
@@ -88,8 +88,8 @@ function readView() { try { return JSON.parse(localStorage.getItem(VIEW_KEY)); }
 for (const type of ['click', 'change']) document.addEventListener(type, () => setTimeout(saveView), true);
 $('compare').onclick=async()=>{
  const before=files.before,after=files.after;if(!before||!after)return;
- if(before.size+after.size>80*1024*1024){$('status').textContent='兩份檔案合計不可超過 80 MB。';return;}
- setBusy(true, '正在上傳檔案…'); $('results').hidden = true; $('empty').hidden = true;
+ if(before.size+after.size>80*1024*1024){$('status').textContent='The two files together must be 80 MB or less.';return;}
+ setMaximized(false); setBusy(true, 'Uploading files…'); $('results').hidden = true; $('empty').hidden = true;
  try {
    const { job_id, uploads } = await apiJson('/api/uploads', { method: 'POST' });
    await Promise.all(sides.map(side => upload(uploads[side], files[side])));
@@ -98,14 +98,14 @@ $('compare').onclick=async()=>{
    const job = await waitForJob(job_id);
    if (job) await showResult(job, { before, after });
  } catch (e) {
-   $('status').className=''; $('status').textContent=e.message||'無法連線至服務，請稍後再試。'; $('empty').hidden=false;
+   $('status').className=''; $('status').textContent=e.message||'Could not reach the service. Please try again.'; $('empty').hidden=false;
  } finally { delete $('compare').dataset.busy; $('beforeFile').disabled=$('afterFile').disabled=false; updateButton(); if ($('status').className === 'busy') $('status').className = ''; }
 };
 // After a reload, bring back the last comparison (or keep waiting for one still running).
 async function restore() {
  const last = await apiJson('/api/me/last-result').catch(() => null);
  if (!last || last.status === 'failed' || last.status === 'cancelled') return;
- setBusy(true, '正在還原上一次的比對結果…'); $('empty').hidden = true;
+ setBusy(true, 'Restoring your last comparison…'); $('empty').hidden = true;
  try {
    const job = last.status === 'done' ? last : await waitForJob(last.job_id);
    if (job) await showResult(job, null, readView());
@@ -119,12 +119,12 @@ async function restore() {
    const session = await auth.init(appConfig);
    if (!session.signedIn) return;
    if (appConfig.auth) {
-     $('modeBadge').innerHTML = '<i></i> 公司內部 · 僅限 Tailscale';
+     $('modeBadge').style.display = 'none';
      $('userEmail').textContent = session.email;
      $('logout').hidden = false;
    }
    await restore();
- } catch (e) { $('status').textContent = '無法連線至服務，請確認網站已啟動。'; }
+ } catch (e) { $('status').textContent = 'Could not reach the service. Make sure the server is running.'; }
 })();
 function changes(page){return(page?.changes||[]).filter(o=>$('annotations').checked||o.kind!=='annotation');}
 function vector(o,color,highlight){const width=Math.max(.65,Number(o.style?.[0])||0),fill=o.style?.[2]?color:'none';let d=(o.path||[]).map(seg=>seg[0].toUpperCase()+' '+seg.slice(1).flat().join(' ')).join(' ');if(o.kind==='rect')d+=' Z';return `<path d="${esc(d)}" fill="${fill}" fill-opacity="${highlight ? .2 : 1}" fill-rule="${o.style?.[6]?'evenodd':'nonzero'}" stroke="${(highlight || o.style?.[1])?color:'none'}" stroke-width="${width}"/>`;}
@@ -150,17 +150,17 @@ function diagram(page, side, box, annotationRegions) {
    const target = annotationRegions.get(o);
    const action = annotation
      ? `class="annotation-target" data-region-index="${target?.regionIndex}" data-annotation-key="${target?.key}" role="button" tabindex="0"
-        aria-label="${esc(`顯示批註 · 區域 ${(target?.regionIndex ?? 0) + 1}：${o.text || '批註'}`)}"`
+        aria-label="${esc(`Show annotation · region ${(target?.regionIndex ?? 0) + 1}: ${o.text || 'Annotation'}`)}"`
      : '';
    (annotation ? annotations : marks).push(`<rect ${action} x="${x - pad}" y="${y - pad}" width="${w + 2 * pad}" height="${h + 2 * pad}"
        fill="${annotation ? 'none' : color}" fill-opacity=".17" stroke="${color}"
        stroke-width="1" vector-effect="non-scaling-stroke" ${annotation ? 'stroke-dasharray="3 3"' : ''}>
-       <title>${esc(annotation ? o.text || '批註' : o.kind === 'char' ? o.text : '圖片')}</title></rect>`);
+       <title>${esc(annotation ? o.text || 'Annotation' : o.kind === 'char' ? o.text : 'Image')}</title></rect>`);
  }
  return `<div class="pdf-layer" aria-hidden="true"
    style="${diffOnly ? `clip-path:url(#${side}-clips)` : $('mode').value === 'faded' ? 'opacity:.23' : ''}"></div>
    <svg class="diff-overlay" viewBox="${box.join(' ')}" preserveAspectRatio="none"
-       role="group" aria-label="${side} 差異圖面">
+       role="group" aria-label="${side} drawing changes">
        <defs><clipPath id="${side}-clips" clipPathUnits="objectBoundingBox">${clips.join('')}</clipPath></defs>
        ${marks.join('')}${annotations.join('')}<rect class="focus-box" fill="none" stroke="#dc9c22" stroke-width="3" vector-effect="non-scaling-stroke" visibility="hidden"/>
    </svg>`;
@@ -181,11 +181,11 @@ async function render() {
    return [side, [view.scrollLeft, view.scrollTop]];
  }));
  clearPanes();
- let removed=0,added=0;result.pages.forEach(p=>{removed+=changes(p.before).length;added+=changes(p.after).length;});$('removedTotal').textContent=removed.toLocaleString();$('addedTotal').textContent=added.toLocaleString();$('summaryTitle').textContent=`${result.pages.length} 頁已解析 · ${result.pages.filter(p=>changes(p.before).length+changes(p.after).length>0).length} 頁有差異`;
+ let removed=0,added=0;result.pages.forEach(p=>{removed+=changes(p.before).length;added+=changes(p.after).length;});$('removedTotal').textContent=removed.toLocaleString();$('addedTotal').textContent=added.toLocaleString();$('summaryTitle').textContent=`${result.pages.length} ${result.pages.length===1?'page':'pages'} parsed · ${result.pages.filter(p=>changes(p.before).length+changes(p.after).length>0).length} with changes`;
  const page = result.pages[pageIndex], number = pageIndex + 1;
  buildRegions(page);
  for (const side of sides) {
-   $(side+'Canvas').innerHTML = `<div class="missing">${page[side] ? '載入原始圖面…' : '此版本沒有對應頁面'}</div>`;
+   $(side+'Canvas').innerHTML = `<div class="missing">${page[side] ? 'Loading original drawing…' : 'No matching page in this version'}</div>`;
    $(side+'Canvas').style.height = '';
    $(side+'Caption').textContent = result.filenames[side];
  }
@@ -194,7 +194,7 @@ async function render() {
    const report = error => {
      if (version !== renderVersion) return;
      console.error(error);
-     $('status').textContent = '無法顯示部分原始 PDF 圖面。';
+     $('status').textContent = 'Some original PDF pages could not be displayed.';
    };
    try {
      const pdfPage = await (await pdfs[side].document).getPage(number);
@@ -244,19 +244,19 @@ async function render() {
          canvas.querySelector('.pdf-layer'), $(side+'Viewport'), $('annotations').checked, report);
    } catch (error) {
      report(error);
-     if (version === renderVersion) $(side+'Canvas').textContent = '無法顯示原始 PDF 圖面。';
+     if (version === renderVersion) $(side+'Canvas').textContent = 'The original PDF page could not be displayed.';
    }
  }));
  if (version !== renderVersion) return;
- const warning=[];if(!page.sameSize)warning.push('兩頁尺寸不同，尚未自動對齊；位置差異可能造成大量標示。');if([page.before,page.after].some(p=>p?.counts.image&&!p?.counts.char&&!p?.counts.line&&!p?.counts.curve))warning.push('此頁可能為掃描圖，會以整個圖片物件比對，沒有 OCR。');$('pageWarning').hidden=!warning.length;$('pageWarning').textContent=warning.join(' ');
+ const warning=[];if(!page.sameSize)warning.push('The two pages are different sizes and are not aligned automatically, so position differences may produce many marks.');if([page.before,page.after].some(p=>p?.counts.image&&!p?.counts.char&&!p?.counts.line&&!p?.counts.curve))warning.push('This page may be a scan. It is compared as a whole image, with no OCR.');$('pageWarning').hidden=!warning.length;$('pageWarning').textContent=warning.join(' ');
  sizeCanvases();
  for (const side of sides) $(side+'Viewport').scrollTo(...positions[side]);
  if (selectedRegion !== null && regions[selectedRegion]) focusRegion(selectedRegion, false);
- $('parseInfo').innerHTML='<table><thead><tr><th>本頁解析物件</th><th>Before</th><th>After</th></tr></thead><tbody>'+Object.entries(names).map(([k,n])=>`<tr><td>${n}</td><td>${(page.before?.counts[k]||0).toLocaleString()}</td><td>${(page.after?.counts[k]||0).toLocaleString()}</td></tr>`).join('')+'</tbody></table><p>原始 PDF 由瀏覽器繪製。總覽先顯示低解析度預覽，放大後會重新繪製可見區域。</p>';
+ $('parseInfo').innerHTML='<table><thead><tr><th>Objects on this page</th><th>Before</th><th>After</th></tr></thead><tbody>'+Object.entries(names).map(([k,n])=>`<tr><td>${n}</td><td>${(page.before?.counts[k]||0).toLocaleString()}</td><td>${(page.after?.counts[k]||0).toLocaleString()}</td></tr>`).join('')+'</tbody></table><p>The original PDF is rendered in your browser. The overview starts as a low-resolution preview, and the visible area is redrawn sharper when you zoom in.</p>';
 }
 function buildRegions(page){const map=new Map(),w=Math.max(page.before?.width||0,page.after?.width||0),h=Math.max(page.before?.height||0,page.after?.height||0);
  for(const side of ['before','after'])for(const o of changes(page[side])){const b=o.box,x=(b[0]+b[2])/2,y=(b[1]+b[3])/2,key=`${Math.floor(y/h*6)}:${Math.floor(x/w*8)}`;if(!map.has(key))map.set(key,{box:[...b],before:0,after:0,kinds:new Set(),texts:[],objects:{before:[],after:[]}});const r=map.get(key);r.box=[Math.min(r.box[0],b[0]),Math.min(r.box[1],b[1]),Math.max(r.box[2],b[2]),Math.max(r.box[3],b[3])];r[side]++;r.objects[side].push(o);r.kinds.add(names[o.kind]);if(o.kind==='annotation'&&o.text)r.texts.push(o.text);}
- regions=[...map.values()].sort((a,b)=>a.box[1]-b.box[1]||a.box[0]-b.box[0]);$('regionCount').textContent=regions.length;$('regions').innerHTML=regions.length?regions.map((r,i)=>`<button class="region" data-index="${i}" title="${esc(r.texts.join(' / '))}">區域 ${String(i+1).padStart(2,'0')}<small>${esc([...r.kinds].join('、'))}</small></button>`).join(''):'<p>本頁沒有差異。</p>';
+ regions=[...map.values()].sort((a,b)=>a.box[1]-b.box[1]||a.box[0]-b.box[0]);$('regionCount').textContent=regions.length;$('regions').innerHTML=regions.length?regions.map((r,i)=>`<button class="region" data-index="${i}" title="${esc(r.texts.join(' / '))}">Region ${String(i+1).padStart(2,'0')}<small>${esc([...r.kinds].join(', '))}</small></button>`).join(''):'<p>No changes on this page.</p>';
  document.querySelectorAll('.region').forEach(b=>b.onclick=()=>focusRegion(Number(b.dataset.index)));
  showRegionObjects(null);
 }
@@ -290,7 +290,7 @@ function showRegionObjects(index, annotationKey) {
  $('objectTable').hidden = index === null;
  $('objectPrompt').hidden = index !== null;
  $('objectTitle').textContent = index === null
-   ? '區域物件差異' : `區域 ${String(index + 1).padStart(2, '0')} · 物件差異`;
+   ? 'Objects in region' : `Region ${String(index + 1).padStart(2, '0')} · objects`;
  $('objectRows').innerHTML = index === null ? '' : attributeSummary(regions[index], annotationKey);
 }
 
@@ -379,6 +379,18 @@ $('fit').onclick = () => {
  resetScroll();
 };
 window.addEventListener('resize', () => { if (result) sizeCanvases(true); });
+function setMaximized(on) {
+ const was = $('results').classList.contains('maximized');
+ $('results').classList.toggle('maximized', on);
+ document.body.classList.toggle('no-scroll', on);
+ $('maximize').setAttribute('aria-pressed', String(on));
+ $('maximize').textContent = on ? '⤡ Exit full view' : '⤢ Maximize';
+ if (result && was !== on) sizeCanvases(true);
+}
+$('maximize').onclick = () => setMaximized(!$('results').classList.contains('maximized'));
+document.addEventListener('keydown', event => {
+ if (event.key === 'Escape' && $('results').classList.contains('maximized') && !$('idleDialog').open) setMaximized(false);
+});
 for (const side of sides) {
  $(side+'Viewport').onscroll = () => {
    panes[side]?.schedule();
@@ -397,7 +409,7 @@ function attributeSummary(region, selectedKey){
  const fmt=n=>String(Number(Number(n).toFixed(2)));
  const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
  const center=o=>[(o.box[0]+o.box[2])/2,(o.box[1]+o.box[3])/2];
- const text=t=>`「${t}」`;
+ const text=t=>`“${t}”`;
  const objectKeys = new Map();
  for (const side of ['before', 'after']) {
    region.objects[side].forEach((object, index) => {
@@ -407,14 +419,14 @@ function attributeSummary(region, selectedKey){
  let fields = [];
  const row = (label, a, b) => fields.push([label, a, b]);
  const describe = object => {
-   if (object.kind === 'char' || object.kind === 'annotation') return text(object.text || '批註');
-   if (object.kind === 'image') return '圖片';
+   if (object.kind === 'char' || object.kind === 'annotation') return text(object.text || 'Annotation');
+   if (object.kind === 'image') return 'Image';
    return '';
  };
  const addObject = (before, after) => {
    const object = before || after;
    const keys = [before, after].map(item => objectKeys.get(item?.source ?? item)).filter(Boolean);
-   const status = before && after ? '修改' : before ? '移除' : '新增';
+   const status = before && after ? 'changed' : before ? 'removed' : 'added';
    const cell = (item, column, color) => {
      if (!item) return '<td class="object-empty">—</td>';
      const content = describe(item);
@@ -427,7 +439,7 @@ function attributeSummary(region, selectedKey){
    const selected = selectedKey && keys.includes(selectedKey) ? ' class="selected-object"' : '';
    rows.push({
      box: object.box,
-     html: `<tr${attributes}${selected}><th scope="row"><button type="button" class="locate-object">${esc(names[object.kind])}${status}</button></th>
+     html: `<tr${attributes}${selected}><th scope="row"><button type="button" class="locate-object">${esc(names[object.kind])} ${status}</button></th>
        ${cell(before, 1, 'old-value')}${cell(after, 2, 'new-value')}</tr>`,
    });
    fields = [];
@@ -435,19 +447,19 @@ function attributeSummary(region, selectedKey){
  for(const a of before){let best=-1,bestScore=Infinity;after.forEach((b,i)=>{if(used.has(i)||a.kind!==b.kind)return;const ac=center(a),bc=center(b),dist=Math.hypot(ac[0]-bc[0],ac[1]-bc[1]);const edge=Math.max(...a.box.map((v,j)=>Math.abs(v-b.box[j])));const exactText=a.text&&a.text===b.text;const threshold=a.kind==='char'?45:12;if(dist>threshold||edge>(a.kind==='char'?100:25))return;const score=(a.kind==='char'?Math.hypot(a.box[0]-b.box[0],a.box[1]-b.box[1]):dist)+(exactText?-5:0);if(score<bestScore){best=i;bestScore=score;}});
  if(best<0){addObject(a,null);continue;}
  used.add(best);const b=after[best];let changed=false;
- if(a.text!==b.text){row(a.kind==='image'?'圖片內容':a.kind==='annotation'?'批註內容':'文字',a.kind==='image'?'原圖片':text(a.text||''),a.kind==='image'?'新圖片':text(b.text||''));changed=true;}
- if(a.kind==='char'){for(const [index,label]of [[0,'字型'],[1,'字級'],[2,'文字顏色']])if(!same(a.style?.[index],b.style?.[index])){row(label,styleText(a.style?.[index]),styleText(b.style?.[index]));changed=true;}}
- else if(a.kind!=='annotation'&&a.kind!=='image'){for(const [index,label]of [[0,'線寬 (pt)'],[1,'描邊'],[2,'填色'],[3,'線條顏色'],[4,'填色顏色'],[5,'虛線樣式']])if(!same(a.style?.[index],b.style?.[index])){row(label,styleText(a.style?.[index]),styleText(b.style?.[index]));changed=true;}}
- if(!same(a.box,b.box)&&(!changed||a.text===b.text)){row('位置 / 範圍 (pt)',boxText(a.box),boxText(b.box));changed=true;}
- if(!changed&&!same(a.path,b.path))row('路徑節點',JSON.stringify(a.path).slice(0,180),JSON.stringify(b.path).slice(0,180));
- else if(!changed&&!same(a.style,b.style))row('批註樣式',styleText(a.style),styleText(b.style));
- else if(!changed&&!same(a.matrix,b.matrix))row('文字變換',JSON.stringify(a.matrix),JSON.stringify(b.matrix));
+ if(a.text!==b.text){row(a.kind==='image'?'Image content':a.kind==='annotation'?'Annotation text':'Text',a.kind==='image'?'Old image':text(a.text||''),a.kind==='image'?'New image':text(b.text||''));changed=true;}
+ if(a.kind==='char'){for(const [index,label]of [[0,'Font'],[1,'Size'],[2,'Text color']])if(!same(a.style?.[index],b.style?.[index])){row(label,styleText(a.style?.[index]),styleText(b.style?.[index]));changed=true;}}
+ else if(a.kind!=='annotation'&&a.kind!=='image'){for(const [index,label]of [[0,'Line width (pt)'],[1,'Stroke'],[2,'Fill'],[3,'Stroke color'],[4,'Fill color'],[5,'Dash pattern']])if(!same(a.style?.[index],b.style?.[index])){row(label,styleText(a.style?.[index]),styleText(b.style?.[index]));changed=true;}}
+ if(!same(a.box,b.box)&&(!changed||a.text===b.text)){row('Position / bounds (pt)',boxText(a.box),boxText(b.box));changed=true;}
+ if(!changed&&!same(a.path,b.path))row('Path points',JSON.stringify(a.path).slice(0,180),JSON.stringify(b.path).slice(0,180));
+ else if(!changed&&!same(a.style,b.style))row('Annotation style',styleText(a.style),styleText(b.style));
+ else if(!changed&&!same(a.matrix,b.matrix))row('Text transform',JSON.stringify(a.matrix),JSON.stringify(b.matrix));
  addObject(a,b);
  }
  after.forEach((b,i)=>{if(!used.has(i))addObject(null,b);});
  return rows.sort((a,b)=>a.box[1]-b.box[1]||a.box[0]-b.box[0]).map(row=>row.html).join('');
  function boxText(box){return '('+box.map(fmt).join(', ')+')';}
- function styleText(v){if(v==null)return '無';if(typeof v==='boolean')return v?'是':'否';if(typeof v==='number')return fmt(v);if(Array.isArray(v))return JSON.stringify(v);return String(v);}
+ function styleText(v){if(v==null)return 'none';if(typeof v==='boolean')return v?'yes':'no';if(typeof v==='number')return fmt(v);if(Array.isArray(v))return JSON.stringify(v);return String(v);}
 }
 
 function pickAnnotation(hits, previous) {
