@@ -73,7 +73,7 @@ data "aws_iam_policy_document" "router" {
     resources = ["arn:aws:ec2:${var.region}:${local.account_id}:instance/*"]
     condition {
       test     = "StringEquals"
-      variable = "aws:ResourceTag/atco-role"
+      variable = "aws:ResourceTag/app-role"
       values   = ["router"]
     }
   }
@@ -132,7 +132,7 @@ resource "aws_launch_template" "router" {
 
   tag_specifications {
     resource_type = "instance"
-    tags          = { Name = "${var.name}-router", "atco-role" = "router" }
+    tags          = { Name = "${var.name}-router", "app-role" = "router" }
   }
 }
 

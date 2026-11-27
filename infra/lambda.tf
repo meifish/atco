@@ -56,8 +56,8 @@ resource "aws_lambda_function" "compare" {
 
   environment {
     variables = {
-      ATCO_TABLE  = aws_dynamodb_table.state.name
-      ATCO_BUCKET = aws_s3_bucket.files.bucket
+      REDLINE_TABLE  = aws_dynamodb_table.state.name
+      REDLINE_BUCKET = aws_s3_bucket.files.bucket
     }
   }
 

@@ -13,7 +13,7 @@
 
 ## 連線方式
 
-員工電腦連上 Tailscale 後開啟 `https://inceptionai.<tailnet>.ts.net`（tailnet 名稱見 Tailscale 管理後台的 DNS 頁面；機器名稱由 `tailscale_hostname` 設定，預設 `inceptionai`）。這個網址由 router 上的 `tailscale serve` 提供（Tailscale 自動簽發的憑證），再轉到私有子網路的 `web.atco.internal:8000`（Cloud Map DNS，容器換 IP 也不影響）。router 也會分享整個 VPC 網段，方便管理員直接連到內部 IP。
+員工電腦連上 Tailscale 後開啟 `https://redline-diff.<tailnet>.ts.net`（tailnet 名稱見 Tailscale 管理後台的 DNS 頁面；機器名稱由 `tailscale_hostname` 設定，預設 `redline-diff`）。這個網址由 router 上的 `tailscale serve` 提供（Tailscale 自動簽發的憑證），再轉到私有子網路的 `web.redline-diff.internal:8000`（Cloud Map DNS，容器換 IP 也不影響）。router 也會分享整個 VPC 網段，方便管理員直接連到內部 IP。
 
 之所以一定要 HTTPS 網址：Cognito 的登入回呼網址必須是 https，瀏覽器的 PKCE 加密功能也只在 HTTPS 下可用。
 
@@ -24,14 +24,14 @@
 1. **DNS**：開啟 MagicDNS 與 HTTPS Certificates，記下 tailnet 名稱（例如 `tail1234.ts.net`）。
 2. **Access controls**：加入 tag 與自動核准路由，例如：
    ```json
-   "tagOwners":     { "tag:atco-router": ["autogroup:admin"] },
-   "autoApprovers": { "routes": { "10.40.0.0/16": ["tag:atco-router"] } }
+   "tagOwners":     { "tag:redline-diff-router": ["autogroup:admin"] },
+   "autoApprovers": { "routes": { "10.40.0.0/16": ["tag:redline-diff-router"] } }
    ```
-   並確認員工可以連到 `tag:atco-router` 的 443 埠（預設的 allow-all 已包含）。
-3. **Keys**：建立 auth key，勾選 Reusable、Ephemeral、Pre-approved，Tags 選 `tag:atco-router`。Ephemeral 讓舊機器離線後自動移除，替換的 router 才能沿用同一個名稱。
+   並確認員工可以連到 `tag:redline-diff-router` 的 443 埠（預設的 allow-all 已包含）。
+3. **Keys**：建立 auth key，勾選 Reusable、Ephemeral、Pre-approved，Tags 選 `tag:redline-diff-router`。Ephemeral 讓舊機器離線後自動移除，替換的 router 才能沿用同一個名稱。
 4. 把 key 存進 SSM Parameter Store（不會進 Terraform state）：
    ```sh
-   aws ssm put-parameter --region ca-central-1 --name /atco/tailscale-auth-key --type SecureString --value 'tskey-auth-...'
+   aws ssm put-parameter --region ca-central-1 --name /redline-diff/tailscale-auth-key --type SecureString --value 'tskey-auth-...'
    ```
 
 subnet router、HTTPS、SSO 分別包含在哪些 Tailscale 方案，請先到官網確認。
@@ -80,7 +80,7 @@ cd infra && terraform apply -var image_tag=$TAG
 - **router 故障**：ASG 自動重建，中斷約幾分鐘。只偵測 EC2 狀態檢查；若 Tailscale 程序異常但機器正常，需手動在 EC2 主控台終止該 instance 讓 ASG 重建。
 - **登入 router**：用 Systems Manager Session Manager（不開 SSH）。
 - **系統更新**：router 每天自動套用安全性更新（dnf-automatic）。換新 AMI：`terraform apply` 後 ASG 會以 instance refresh 替換。
-- **比對失敗**：看 CloudWatch Logs `/aws/lambda/atco-compare`；超過 3 次失敗的訊息在 DLQ。執行超過 Lambda 上限的工作，網站會顯示失敗。
+- **比對失敗**：看 CloudWatch Logs `/aws/lambda/redline-diff-compare`；超過 3 次失敗的訊息在 DLQ。執行超過 Lambda 上限的工作，網站會顯示失敗。
 - **改用 NAT Gateway**：建立 NAT Gateway，把私有路由表的 0.0.0.0/0 改指向它，再移除 router 開機腳本中的 replace-route。應用程式不用改。
 
 ## 檢查

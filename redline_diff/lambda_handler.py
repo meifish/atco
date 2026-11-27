@@ -14,8 +14,8 @@ from .store import DynamoJobStore
 
 logging.getLogger().setLevel(logging.INFO)
 _region = os.environ.get('AWS_REGION', '')
-store = DynamoJobStore(os.environ.get('ATCO_TABLE', ''), _region)
-storage = S3Storage(os.environ.get('ATCO_BUCKET', ''), _region)
+store = DynamoJobStore(os.environ.get('REDLINE_TABLE', ''), _region)
+storage = S3Storage(os.environ.get('REDLINE_BUCKET', ''), _region)
 
 
 def handler(event, context):

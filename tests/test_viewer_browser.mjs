@@ -10,7 +10,7 @@ import { chromium } from 'playwright';
 const python = process.env.PYTHON || 'python3';
 
 test('cropped A0 originals, overlays and tiles stay aligned through zoom and pan', { timeout: 45000 }, async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'atco-viewer-'));
+    const dir = await mkdtemp(join(tmpdir(), 'redline-diff-viewer-'));
     let server, browser;
     try {
         execFileSync(python, ['-c', `

@@ -112,16 +112,16 @@ resource "aws_ecs_task_definition" "web" {
     essential    = true
     portMappings = [{ containerPort = local.web_port, protocol = "tcp" }]
     environment = [
-      { name = "ATCO_MODE", value = "aws" },
+      { name = "REDLINE_MODE", value = "aws" },
       { name = "AWS_REGION", value = var.region },
-      { name = "ATCO_BUCKET", value = aws_s3_bucket.files.bucket },
-      { name = "ATCO_TABLE", value = aws_dynamodb_table.state.name },
-      { name = "ATCO_QUEUE_URL", value = aws_sqs_queue.jobs.url },
-      { name = "ATCO_COGNITO_USER_POOL_ID", value = aws_cognito_user_pool.main.id },
-      { name = "ATCO_COGNITO_CLIENT_ID", value = aws_cognito_user_pool_client.web.id },
-      { name = "ATCO_COGNITO_DOMAIN", value = "https://${aws_cognito_user_pool_domain.main.domain}.auth.${var.region}.amazoncognito.com" },
-      { name = "ATCO_SITE_URL", value = local.site_url },
-      { name = "ATCO_JOB_STALE_SECONDS", value = tostring(local.stale_after) },
+      { name = "REDLINE_BUCKET", value = aws_s3_bucket.files.bucket },
+      { name = "REDLINE_TABLE", value = aws_dynamodb_table.state.name },
+      { name = "REDLINE_QUEUE_URL", value = aws_sqs_queue.jobs.url },
+      { name = "REDLINE_COGNITO_USER_POOL_ID", value = aws_cognito_user_pool.main.id },
+      { name = "REDLINE_COGNITO_CLIENT_ID", value = aws_cognito_user_pool_client.web.id },
+      { name = "REDLINE_COGNITO_DOMAIN", value = "https://${aws_cognito_user_pool_domain.main.domain}.auth.${var.region}.amazoncognito.com" },
+      { name = "REDLINE_SITE_URL", value = local.site_url },
+      { name = "REDLINE_JOB_STALE_SECONDS", value = tostring(local.stale_after) },
     ]
     healthCheck = {
       command     = ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:${local.web_port}/healthz', timeout=3)"]

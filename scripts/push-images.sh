@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 REGION=${1:?usage: scripts/push-images.sh <aws-region>}
-NAME=${ATCO_NAME:-atco}
+NAME=${APP_NAME:-redline-diff}
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 REGISTRY="$ACCOUNT.dkr.ecr.$REGION.amazonaws.com"
 TAG=$(git rev-parse --short=12 HEAD)$(git diff --quiet HEAD -- . ':!infra' || echo "-dirty-$(date +%s)")

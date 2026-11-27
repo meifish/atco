@@ -1,6 +1,6 @@
 """FastAPI web service: static site, job API, and (local mode) file storage.
 
-Run in AWS:   uvicorn --factory atco_service.app:create_app --host 0.0.0.0 --port 8000
+Run in AWS:   uvicorn --factory redline_diff.app:create_app --host 0.0.0.0 --port 8000
 Run locally:  python server.py
 """
 import logging
@@ -63,7 +63,7 @@ def create_app(settings=None, store=None, storage=None, queue=None, verifier=Non
         queue = queue or LocalQueue(store, storage)
         verifier = verifier or LocalVerifier()
 
-    app = FastAPI(title='ATCO Drawing Diff', docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(title='Redline Diff', docs_url=None, redoc_url=None, openapi_url=None)
     app.state.store, app.state.storage, app.state.queue = store, storage, queue
 
     @app.middleware('http')

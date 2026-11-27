@@ -9,11 +9,11 @@
 // - The Cognito refresh token (12 hours) is the hard cap.
 // - Logout cancels running jobs and deletes the user's data on the server, revokes
 //   the refresh token, clears browser state and ends the Cognito session.
-const TOKENS = 'atco.tokens', PKCE = 'atco.pkce', ACTIVITY = 'atco.lastActivity';
+const TOKENS = 'redline-diff.tokens', PKCE = 'redline-diff.pkce', ACTIVITY = 'redline-diff.lastActivity';
 export const IDLE_LIMIT_MS = 4 * 60 * 60 * 1000;
 export const PROMPT_MS = 2 * 60 * 1000;
 const REFRESH_BEFORE_MS = 5 * 60 * 1000;
-const VIEW_STATE_PREFIX = 'atco:';
+const VIEW_STATE_PREFIX = 'redline-diff:';
 
 let config = null, refreshing = null, promptTimer = null, lastWrite = 0, loggingOut = false;
 const $ = id => document.getElementById(id);

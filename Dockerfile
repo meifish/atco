@@ -11,9 +11,9 @@ COPY requirements.txt requirements-web.txt ./
 RUN pip install --no-cache-dir -r requirements-web.txt
 COPY --from=pdfjs /src/node_modules/pdfjs-dist node_modules/pdfjs-dist
 COPY compare.py ./
-COPY atco_service atco_service
+COPY redline_diff redline_diff
 COPY static static
-RUN useradd --system --uid 10001 atco
-USER atco
+RUN useradd --system --uid 10001 redline-diff
+USER redline-diff
 EXPOSE 8000
-CMD ["uvicorn", "--factory", "atco_service.app:create_app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--no-server-header"]
+CMD ["uvicorn", "--factory", "redline_diff.app:create_app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--no-server-header"]

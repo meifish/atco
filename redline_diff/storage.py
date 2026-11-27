@@ -79,7 +79,7 @@ class LocalStorage:
     """Files in a temporary folder; URLs are signed and expire like presigned S3 URLs."""
 
     def __init__(self, root=None, upload_seconds=900, download_seconds=3600):
-        self.root = Path(root or tempfile.mkdtemp(prefix='atco-'))
+        self.root = Path(root or tempfile.mkdtemp(prefix='redline-diff-'))
         self.secret = secrets.token_bytes(32)
         self.upload_seconds, self.download_seconds = upload_seconds, download_seconds
 

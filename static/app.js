@@ -9,7 +9,7 @@ function selectFile(side,file){if(!file)return;files[side]=file;$(side+'Name').t
 function updateButton(){$('compare').disabled=!files.before||!files.after;}
 for(const side of ['before','after']){const input=$(side+'File'),drop=$(side+'Drop');input.onchange=()=>selectFile(side,input.files[0]);drop.ondragover=e=>{e.preventDefault();drop.classList.add('drag');};drop.ondragleave=()=>drop.classList.remove('drag');drop.ondrop=e=>{e.preventDefault();drop.classList.remove('drag');if(!$('compare').dataset.busy)selectFile(side,e.dataTransfer.files[0]);};}
 let auth, appConfig, polling = 0;
-const VIEW_KEY = 'atco:view';
+const VIEW_KEY = 'redline-diff:view';
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const api = (path, options) => auth.apiFetch(path, options);
 async function apiJson(path, options) {

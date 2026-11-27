@@ -6,7 +6,7 @@ variable "region" {
 variable "name" {
   description = "Prefix for resource names"
   type        = string
-  default     = "atco"
+  default     = "redline-diff"
 }
 
 variable "vpc_cidr" {
@@ -23,19 +23,19 @@ variable "tailnet_dns_name" {
 variable "tailscale_hostname" {
   description = "Machine name of the router; the site becomes https://<this>.<tailnet_dns_name>"
   type        = string
-  default     = "inceptionai"
+  default     = "redline-diff"
 }
 
 variable "tailscale_auth_key_parameter" {
   description = "SSM Parameter Store name of a SecureString holding a reusable, ephemeral, pre-approved, tagged Tailscale auth key"
   type        = string
-  default     = "/atco/tailscale-auth-key"
+  default     = "/redline-diff/tailscale-auth-key"
 }
 
 variable "tailscale_tag" {
   description = "Tag the auth key assigns to the router (must exist in the tailnet policy's tagOwners)"
   type        = string
-  default     = "tag:atco-router"
+  default     = "tag:redline-diff-router"
 }
 
 variable "router_instance_type" {

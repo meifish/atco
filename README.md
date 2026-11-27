@@ -1,4 +1,4 @@
-# ATCO Drawing Diff
+# Redline Diff
 
 施工圖 PDF 物件比對網站，可部署在 AWS 供多人同時使用，也能在本機單人執行。上傳 Before / After，網站會解析每頁文字、線條、向量路徑、圖片與批註，排除相同物件，再以左右兩欄顯示差異。
 
@@ -28,11 +28,11 @@
 | 路徑 | 內容 |
 | --- | --- |
 | `compare.py` | PDF 物件解析與比對（不變） |
-| `atco_service/app.py` | FastAPI 網站與 API |
-| `atco_service/auth.py` | Cognito JWT 驗證 |
-| `atco_service/store.py` | job 狀態（DynamoDB／本機記憶體） |
-| `atco_service/storage.py` | 檔案（S3 預簽網址／本機資料夾） |
-| `atco_service/jobs.py`、`lambda_handler.py` | 比對工作與 SQS 觸發的 Lambda |
+| `redline_diff/app.py` | FastAPI 網站與 API |
+| `redline_diff/auth.py` | Cognito JWT 驗證 |
+| `redline_diff/store.py` | job 狀態（DynamoDB／本機記憶體） |
+| `redline_diff/storage.py` | 檔案（S3 預簽網址／本機資料夾） |
+| `redline_diff/jobs.py`、`lambda_handler.py` | 比對工作與 SQS 觸發的 Lambda |
 | `static/auth.js` | 前端登入、續期、閒置登出 |
 | `Dockerfile`、`Dockerfile.compare` | ECS 網站與比對 Lambda 的映像檔 |
 | `infra/` | Terraform（部署步驟見 [infra/README.md](infra/README.md)） |

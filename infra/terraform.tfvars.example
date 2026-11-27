@@ -1,6 +1,6 @@
 region                = "ca-central-1"
 tailnet_dns_name      = "tail1234.ts.net" # Tailscale admin console > DNS > Tailnet name
-tailscale_hostname    = "inceptionai"     # site becomes https://inceptionai.tail1234.ts.net
-cognito_domain_prefix = "atco-login-yourcompany"
+tailscale_hostname    = "redline-diff"     # site becomes https://redline-diff.tail1234.ts.net
+cognito_domain_prefix = "redline-diff-login-yourcompany"
 image_tag             = "replace-with-output-of-scripts/push-images.sh"
 web_desired_count     = 2

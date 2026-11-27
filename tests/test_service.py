@@ -14,12 +14,12 @@ from fastapi.testclient import TestClient
 from moto import mock_aws
 from reportlab.pdfgen import canvas
 
-from atco_service.app import create_app
-from atco_service.auth import AuthError, CognitoVerifier
-from atco_service.config import Settings
-from atco_service.jobs import run_job
-from atco_service.storage import LocalStorage, S3Storage, job_key
-from atco_service.store import DynamoJobStore, MemoryJobStore
+from redline_diff.app import create_app
+from redline_diff.auth import AuthError, CognitoVerifier
+from redline_diff.config import Settings
+from redline_diff.jobs import run_job
+from redline_diff.storage import LocalStorage, S3Storage, job_key
+from redline_diff.store import DynamoJobStore, MemoryJobStore
 
 
 def pdf(text):
@@ -179,12 +179,12 @@ class CognitoTests(unittest.TestCase):
 
     def test_api_requires_token_in_aws_mode(self):
         settings = Settings(mode='aws', cognito_domain='https://x.auth', cognito_client_id='client',
-                            site_url='https://inceptionai.example.ts.net')
+                            site_url='https://redline-diff.example.ts.net')
         client = TestClient(create_app(settings, MemoryJobStore(), LocalStorage(tempfile.mkdtemp()),
                                        InlineQueue(), self.verifier))
         self.assertEqual(client.post('/api/uploads').status_code, 401)
         self.assertEqual(client.post('/api/uploads', headers={'Authorization': self.token()}).status_code, 200)
-        self.assertEqual(client.get('/api/config').json()['auth']['redirectUri'], 'https://inceptionai.example.ts.net/')
+        self.assertEqual(client.get('/api/config').json()['auth']['redirectUri'], 'https://redline-diff.example.ts.net/')
 
 
 @mock_aws
@@ -193,14 +193,14 @@ class AwsBackendTests(unittest.TestCase):
         os.environ.update(AWS_ACCESS_KEY_ID='x', AWS_SECRET_ACCESS_KEY='x', AWS_DEFAULT_REGION='ca-central-1')
         region = 'ca-central-1'
         s3 = boto3.client('s3', region_name=region)
-        s3.create_bucket(Bucket='atco-test', CreateBucketConfiguration={'LocationConstraint': region})
+        s3.create_bucket(Bucket='redline-diff-test', CreateBucketConfiguration={'LocationConstraint': region})
         ddb = boto3.client('dynamodb', region_name=region)
-        ddb.create_table(TableName='atco-test', BillingMode='PAY_PER_REQUEST',
+        ddb.create_table(TableName='redline-diff-test', BillingMode='PAY_PER_REQUEST',
                          KeySchema=[{'AttributeName': 'pk', 'KeyType': 'HASH'}, {'AttributeName': 'sk', 'KeyType': 'RANGE'}],
                          AttributeDefinitions=[{'AttributeName': 'pk', 'AttributeType': 'S'},
                                                {'AttributeName': 'sk', 'AttributeType': 'S'}])
-        self.store = DynamoJobStore('atco-test', region)
-        self.storage = S3Storage('atco-test', region)
+        self.store = DynamoJobStore('redline-diff-test', region)
+        self.storage = S3Storage('redline-diff-test', region)
 
     def test_job_lifecycle_and_logout(self):
         user, job_id = 'u1', 'a' * 32
@@ -236,10 +236,10 @@ class AwsBackendTests(unittest.TestCase):
         for key in keys:
             self.storage.put(key, pdf('same'), 'application/pdf')
         self.store.create_job(user, job_id, *keys, {})
-        with mock.patch.dict(os.environ, {'ATCO_TABLE': 'atco-test', 'ATCO_BUCKET': 'atco-test',
+        with mock.patch.dict(os.environ, {'REDLINE_TABLE': 'redline-diff-test', 'REDLINE_BUCKET': 'redline-diff-test',
                                           'AWS_REGION': 'ca-central-1'}):
             import importlib
-            import atco_service.lambda_handler as handler
+            import redline_diff.lambda_handler as handler
             importlib.reload(handler)
             out = handler.handler({'Records': [{'body': json.dumps({'user_id': user, 'job_id': job_id})}]}, None)
         self.assertEqual(out, {'outcomes': ['done']})

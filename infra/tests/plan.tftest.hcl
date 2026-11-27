@@ -17,7 +17,7 @@ mock_provider "aws" {
 variables {
   region                = "ca-central-1"
   tailnet_dns_name      = "tail1234.ts.net"
-  cognito_domain_prefix = "atco-login-test"
+  cognito_domain_prefix = "redline-diff-login-test"
   image_tag             = "test"
 }
 
@@ -25,7 +25,7 @@ run "plan" {
   command = plan
 
   assert {
-    condition     = local.site_url == "https://inceptionai.tail1234.ts.net"
+    condition     = local.site_url == "https://redline-diff.tail1234.ts.net"
     error_message = "site URL should be the router's tailscale serve name"
   }
   assert {

@@ -10,7 +10,7 @@ terraform {
   # Keep state in S3 once more than one person runs Terraform, e.g.:
   # backend "s3" {
   #   bucket       = "my-terraform-state"
-  #   key          = "atco/terraform.tfstate"
+  #   key          = "redline-diff/terraform.tfstate"
   #   region       = "ca-central-1"
   #   use_lockfile = true
   # }

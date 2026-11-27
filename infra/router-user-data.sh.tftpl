@@ -8,7 +8,7 @@ INSTANCE_ID=$(curl -sfH "X-aws-ec2-metadata-token: $TOKEN" "$IMDS/meta-data/inst
 export AWS_DEFAULT_REGION=${region}
 
 # 1. NAT: forward and masquerade traffic from the VPC out of the primary interface.
-cat >/etc/sysctl.d/90-atco-router.conf <<SYSCTL
+cat >/etc/sysctl.d/90-redline-diff-router.conf <<SYSCTL
 net.ipv4.ip_forward = 1
 net.ipv6.conf.all.forwarding = 1
 net.ipv4.conf.all.rp_filter = 0

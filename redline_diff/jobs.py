@@ -70,7 +70,7 @@ class LocalQueue:
 
     def __init__(self, store, storage, workers=2):
         self.store, self.storage = store, storage
-        self.pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix='atco-job')
+        self.pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix='redline-diff-job')
 
     def send(self, user_id, job_id):
         return self.pool.submit(run_job, self.store, self.storage, user_id, job_id)
