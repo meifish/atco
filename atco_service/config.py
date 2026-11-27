@@ -26,7 +26,7 @@ class Settings:
     cognito_user_pool_id: str = ''
     cognito_client_id: str = ''
     cognito_domain: str = ''  # https://<prefix>.auth.<region>.amazoncognito.com
-    site_url: str = ''        # https://atco.<tailnet>.ts.net
+    site_url: str = ''        # https://inceptionai.<tailnet>.ts.net
     # A job still "running" after this long has exceeded the Lambda limit
     # (timeout or memory) and is reported as failed.
     job_stale_seconds: int = 960

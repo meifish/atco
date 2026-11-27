@@ -13,7 +13,7 @@
 
 ## 連線方式
 
-員工電腦連上 Tailscale 後開啟 `https://<tailscale_hostname>.<tailnet>.ts.net`。這個網址由 router 上的 `tailscale serve` 提供（Tailscale 自動簽發的憑證），再轉到私有子網路的 `web.atco.internal:8000`（Cloud Map DNS，容器換 IP 也不影響）。router 也會分享整個 VPC 網段，方便管理員直接連到內部 IP。
+員工電腦連上 Tailscale 後開啟 `https://inceptionai.<tailnet>.ts.net`（tailnet 名稱見 Tailscale 管理後台的 DNS 頁面；機器名稱由 `tailscale_hostname` 設定，預設 `inceptionai`）。這個網址由 router 上的 `tailscale serve` 提供（Tailscale 自動簽發的憑證），再轉到私有子網路的 `web.atco.internal:8000`（Cloud Map DNS，容器換 IP 也不影響）。router 也會分享整個 VPC 網段，方便管理員直接連到內部 IP。
 
 之所以一定要 HTTPS 網址：Cognito 的登入回呼網址必須是 https，瀏覽器的 PKCE 加密功能也只在 HTTPS 下可用。
 

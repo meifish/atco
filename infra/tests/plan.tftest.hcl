@@ -25,7 +25,7 @@ run "plan" {
   command = plan
 
   assert {
-    condition     = local.site_url == "https://atco.tail1234.ts.net"
+    condition     = local.site_url == "https://inceptionai.tail1234.ts.net"
     error_message = "site URL should be the router's tailscale serve name"
   }
   assert {

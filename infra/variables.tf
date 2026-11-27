@@ -23,7 +23,7 @@ variable "tailnet_dns_name" {
 variable "tailscale_hostname" {
   description = "Machine name of the router; the site becomes https://<this>.<tailnet_dns_name>"
   type        = string
-  default     = "atco"
+  default     = "inceptionai"
 }
 
 variable "tailscale_auth_key_parameter" {

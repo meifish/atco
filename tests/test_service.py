@@ -179,12 +179,12 @@ class CognitoTests(unittest.TestCase):
 
     def test_api_requires_token_in_aws_mode(self):
         settings = Settings(mode='aws', cognito_domain='https://x.auth', cognito_client_id='client',
-                            site_url='https://atco.example.ts.net')
+                            site_url='https://inceptionai.example.ts.net')
         client = TestClient(create_app(settings, MemoryJobStore(), LocalStorage(tempfile.mkdtemp()),
                                        InlineQueue(), self.verifier))
         self.assertEqual(client.post('/api/uploads').status_code, 401)
         self.assertEqual(client.post('/api/uploads', headers={'Authorization': self.token()}).status_code, 200)
-        self.assertEqual(client.get('/api/config').json()['auth']['redirectUri'], 'https://atco.example.ts.net/')
+        self.assertEqual(client.get('/api/config').json()['auth']['redirectUri'], 'https://inceptionai.example.ts.net/')
 
 
 @mock_aws

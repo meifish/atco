@@ -1,6 +1,6 @@
 region                = "ca-central-1"
 tailnet_dns_name      = "tail1234.ts.net" # Tailscale admin console > DNS > Tailnet name
-tailscale_hostname    = "atco"            # site becomes https://atco.tail1234.ts.net
+tailscale_hostname    = "inceptionai"     # site becomes https://inceptionai.tail1234.ts.net
 cognito_domain_prefix = "atco-login-yourcompany"
 image_tag             = "replace-with-output-of-scripts/push-images.sh"
 web_desired_count     = 2
