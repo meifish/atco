@@ -89,7 +89,7 @@ for (const type of ['click', 'change']) document.addEventListener(type, () => se
 $('compare').onclick=async()=>{
  const before=files.before,after=files.after;if(!before||!after)return;
  if(before.size+after.size>80*1024*1024){$('status').textContent='The two files together must be 80 MB or less.';return;}
- setBusy(true, 'Uploading files…'); $('results').hidden = true; $('empty').hidden = true;
+ setMaximized(false); setBusy(true, 'Uploading files…'); $('results').hidden = true; $('empty').hidden = true;
  try {
    const { job_id, uploads } = await apiJson('/api/uploads', { method: 'POST' });
    await Promise.all(sides.map(side => upload(uploads[side], files[side])));
@@ -379,6 +379,18 @@ $('fit').onclick = () => {
  resetScroll();
 };
 window.addEventListener('resize', () => { if (result) sizeCanvases(true); });
+function setMaximized(on) {
+ const was = $('results').classList.contains('maximized');
+ $('results').classList.toggle('maximized', on);
+ document.body.classList.toggle('no-scroll', on);
+ $('maximize').setAttribute('aria-pressed', String(on));
+ $('maximize').textContent = on ? '⤡ Exit full view' : '⤢ Maximize';
+ if (result && was !== on) sizeCanvases(true);
+}
+$('maximize').onclick = () => setMaximized(!$('results').classList.contains('maximized'));
+document.addEventListener('keydown', event => {
+ if (event.key === 'Escape' && $('results').classList.contains('maximized') && !$('idleDialog').open) setMaximized(false);
+});
 for (const side of sides) {
  $(side+'Viewport').onscroll = () => {
    panes[side]?.schedule();
