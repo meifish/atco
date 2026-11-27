@@ -379,6 +379,16 @@ $('fit').onclick = () => {
  resetScroll();
 };
 window.addEventListener('resize', () => { if (result) sizeCanvases(true); });
+function setRegionsCollapsed(on) {
+ document.querySelector('.workspace').classList.toggle('regions-collapsed', on);
+ $('toggleRegions').setAttribute('aria-expanded', String(!on));
+ $('toggleRegions').textContent = on ? '»' : '«';
+ $('toggleRegions').title = on ? 'Show region list' : 'Hide region list';
+ try { localStorage.setItem('regionsCollapsed', on ? '1' : ''); } catch {}
+ if (result) sizeCanvases(true);
+}
+$('toggleRegions').onclick = () => setRegionsCollapsed(!document.querySelector('.workspace').classList.contains('regions-collapsed'));
+try { if (localStorage.getItem('regionsCollapsed')) setRegionsCollapsed(true); } catch {}
 function setMaximized(on) {
  const was = $('results').classList.contains('maximized');
  $('results').classList.toggle('maximized', on);
