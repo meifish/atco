@@ -56,7 +56,7 @@ for name, label in [('before', 'old'), ('after', 'new')]:
         page.on('pageerror', error => errors.push(error.message));
         page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
         let requests = 0;
-        page.on('request', request => { if (request.url().endsWith('/api/compare')) requests++; });
+        page.on('request', request => { if (request.method() === 'POST' && request.url().endsWith('/api/jobs')) requests++; });
 
         await page.goto(url);
         await page.locator('#beforeFile').setInputFiles(join(dir, 'before.pdf'));

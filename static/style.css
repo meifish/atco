@@ -31,3 +31,15 @@
 #objectRows tr{cursor:pointer}
 #objectRows tr:hover:not(.selected-object){background:#f4f8f6}
 .locate-object{font-weight:inherit;text-align:left}
+.header-right{display:flex;align-items:center;gap:14px}
+.user-email{font-size:12px;color:#60706f}
+.logout{font-size:12px;padding:5px 10px}
+.signin{max-width:520px;margin:12vh auto;padding:36px;background:white;border:1px solid var(--line);border-radius:8px}
+.signin h1{margin:8px 0 10px;font-size:28px}
+.signin p{color:#60706f;line-height:1.6}
+.signin-message{color:var(--red)!important;min-height:1.2em}
+.idle-dialog{border:1px solid var(--line);border-radius:8px;padding:24px 28px;max-width:420px}
+.idle-dialog::backdrop{background:rgba(20,35,38,.35)}
+.idle-dialog h2{margin:0 0 8px;font-size:20px}
+.idle-dialog p{line-height:1.6;color:#41524f}
+.dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}

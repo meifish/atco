@@ -1,0 +1,58 @@
+#!/bin/bash
+# Boot script for the Tailscale subnet router + NAT instance (Amazon Linux 2023, arm64).
+set -euxo pipefail
+
+IMDS=http://169.254.169.254/latest
+TOKEN=$(curl -sfX PUT "$IMDS/api/token" -H 'X-aws-ec2-metadata-token-ttl-seconds: 300')
+INSTANCE_ID=$(curl -sfH "X-aws-ec2-metadata-token: $TOKEN" "$IMDS/meta-data/instance-id")
+export AWS_DEFAULT_REGION=${region}
+
+# 1. NAT: forward and masquerade traffic from the VPC out of the primary interface.
+cat >/etc/sysctl.d/90-atco-router.conf <<SYSCTL
+net.ipv4.ip_forward = 1
+net.ipv6.conf.all.forwarding = 1
+net.ipv4.conf.all.rp_filter = 0
+net.ipv4.conf.default.rp_filter = 0
+SYSCTL
+sysctl --system
+dnf install -y nftables
+IFACE=$(ip -o -4 route show to default | awk '{print $5; exit}')
+cat >/etc/sysconfig/nftables.conf <<NFT
+flush ruleset
+table ip nat {
+  chain postrouting {
+    type nat hook postrouting priority srcnat; policy accept;
+    oifname "$IFACE" ip saddr ${vpc_cidr} masquerade
+  }
+}
+NFT
+systemctl enable --now nftables
+systemctl restart nftables
+
+aws ec2 modify-instance-attribute --instance-id "$INSTANCE_ID" --no-source-dest-check
+aws ec2 replace-route --route-table-id ${route_table_id} --destination-cidr-block 0.0.0.0/0 --instance-id "$INSTANCE_ID" \
+  || aws ec2 create-route --route-table-id ${route_table_id} --destination-cidr-block 0.0.0.0/0 --instance-id "$INSTANCE_ID"
+
+# 2. Tailscale subnet router, plus HTTPS for the site via `tailscale serve`.
+curl -fsSL https://pkgs.tailscale.com/stable/amazon-linux/2023/tailscale.repo -o /etc/yum.repos.d/tailscale.repo
+dnf install -y tailscale
+systemctl enable --now tailscaled
+# Recommended for subnet routers: UDP throughput
+ethtool -K "$IFACE" rx-udp-gro-forwarding on rx-gro-list off || true
+
+AUTH_KEY=$(aws ssm get-parameter --with-decryption --name '${auth_key_parameter}' --query Parameter.Value --output text)
+tailscale up \
+  --authkey="$AUTH_KEY" \
+  --hostname='${tailscale_hostname}' \
+  --advertise-tags='${tailscale_tag}' \
+  --advertise-routes='${vpc_cidr}' \
+  --accept-dns=false
+unset AUTH_KEY
+
+# Proxies https://${tailscale_hostname}.<tailnet>/ to the ECS web tasks (Cloud Map DNS).
+tailscale serve --bg --https=443 '${web_target}'
+
+# Security updates for the OS once a day.
+dnf install -y dnf-automatic
+sed -i 's/^upgrade_type.*/upgrade_type = security/; s/^apply_updates.*/apply_updates = yes/' /etc/dnf/automatic.conf
+systemctl enable --now dnf-automatic.timer
